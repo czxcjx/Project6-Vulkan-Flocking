@@ -27,8 +27,8 @@
 #include "vulkanexamplebase.h"
 
 #define VERTEX_BUFFER_BIND_ID 0
-#define ENABLE_VALIDATION true // LOOK: toggle Vulkan validation layers. These make debugging much easier!
-#define PARTICLE_COUNT 4 * 1024 // LOOK: change particle count here
+#define ENABLE_VALIDATION false // LOOK: toggle Vulkan validation layers. These make debugging much easier!
+#define PARTICLE_COUNT 4 * 256 // LOOK: change particle count here
 
 // LOOK: constants for the boids algorithm. These will be passed to the GPU compute part of the assignment
 // using a Uniform Buffer. These parameters should yield a stable and pleasing simulation for an
@@ -157,7 +157,8 @@ public:
 		for (auto& particle : particleBuffer)
 		{
 			particle.pos = glm::vec2(rDistribution(rGenerator), rDistribution(rGenerator));
-			// TODO: add randomized velocities with a slight scale here, something like 0.1f.
+			// DONE: add randomized velocities with a slight scale here, something like 0.1f.
+      particle.vel = glm::vec2(rDistribution(rGenerator), rDistribution(rGenerator)) * 0.1f;
 		}
 
 		VkDeviceSize storageBufferSize = particleBuffer.size() * sizeof(Particle);
@@ -244,7 +245,7 @@ public:
 			VERTEX_BUFFER_BIND_ID,
 			1,
 			VK_FORMAT_R32G32_SFLOAT,
-			offsetof(Particle, pos)); // TODO: change this so that we can color the particles based on velocity.
+			offsetof(Particle, vel)); // DONE: change this so that we can color the particles based on velocity.
 
 		// vertices.inputState encapsulates everything we need for these particular buffers to
 		// interface with the graphics pipeline.
@@ -540,13 +541,30 @@ public:
 			compute.descriptorSets[0],
 			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			2,
-			&compute.uniformBuffer.descriptor)
+			&compute.uniformBuffer.descriptor),
 
-			// TODO: write the second descriptorSet, using the top for reference.
+			// DONE: write the second descriptorSet, using the top for reference.
 			// We want the descriptorSets to be used for flip-flopping:
 			// on one frame, we use one descriptorSet with the compute pass,
 			// on the next frame, we use the other.
 			// What has to be different about how the second descriptorSet is written here?
+      vkTools::initializers::writeDescriptorSet(
+      compute.descriptorSets[1], 
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      0, 
+      &compute.storageBufferB.descriptor),
+
+      vkTools::initializers::writeDescriptorSet(
+      compute.descriptorSets[1],
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      1,
+      &compute.storageBufferA.descriptor),
+
+      vkTools::initializers::writeDescriptorSet(
+      compute.descriptorSets[1],
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      2,
+      &compute.uniformBuffer.descriptor)
 		};
 
 		vkUpdateDescriptorSets(device, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, NULL);
@@ -583,13 +601,15 @@ public:
 		// are done executing.
 		VK_CHECK_RESULT(vkQueueSubmit(compute.queue, 1, &computeSubmitInfo, compute.fence));
 
-		// TODO: handle flip-flop logic. We want the next iteration to
+		// DONE: handle flip-flop logic. We want the next iteration to
 		// run the compute pipeline with flipped SSBOs, so we have to
 		// swap the descriptorSets, which each allow access to the SSBOs
 		// in one configuration.
 		// We also want to flip what SSBO we draw with in the next
 		// pass through the graphics pipeline.
 		// Feel free to use std::swap here. You should need it twice.
+    std::swap(compute.descriptorSets[0], compute.descriptorSets[1]);
+    std::swap(compute.storageBufferA, compute.storageBufferB);
 	}
 
 	// Record command buffers for drawing using the graphics pipeline
